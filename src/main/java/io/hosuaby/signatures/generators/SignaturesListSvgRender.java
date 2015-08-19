@@ -16,10 +16,10 @@ import io.codearte.jfairy.producer.person.Address;
 import io.hosuaby.signatures.generators.config.BatikConfig;
 
 /**
- * Creates SVG document from the list of random signatures.
+ * Renders list of signatures to SVG document.
  */
 @Component
-public class SignaturesSvgListCreator {
+public class SignaturesListSvgRender {
 
     /** Date format patterns */
     private static final String[] DATE_FORMATS = {
@@ -35,7 +35,12 @@ public class SignaturesSvgListCreator {
     @Autowired
     private Random randomizer;
 
-    public SVGGraphics2D draw(List<RandomSignature> signatures) {
+    /**
+     * Renders provided list of signatures as SVG document.
+     * @param signatures    list of signatures
+     * @return {@link SVGGraphics2D} of SVG document
+     */
+    public SVGGraphics2D render(List<RandomSignature> signatures) {
 
       /* Create SVG path */
       Document document = domImpl.createDocument(
@@ -114,8 +119,6 @@ public class SignaturesSvgListCreator {
      * @return the full name of person from signature
      */
     private String getFullName(RandomSignature signature) {
-        StringBuilder builder = new StringBuilder();
-
         String firstName = ucfirst(signature.getPerson().firstName());
         String lastName  = signature.getPerson().lastName();
 
@@ -145,19 +148,10 @@ public class SignaturesSvgListCreator {
      */
     private String[] getAddress(RandomSignature signature) {
         Address address = signature.getPerson().getAddress();
-
-
-//        String[] parts = signature.getAddress().split(", ");
-//        int halfIndex = parts.length / 2;
         String[] broken = new String[2];
 
         broken[0] = address.streetNumber() + ", " + address.street() + ",";
         broken[1] = address.getPostalCode() + ", " + address.getCity();
-
-//        broken[0] = String.join(
-//                ", ", Arrays.copyOfRange(parts, 0, halfIndex));
-//        broken[1] = String.join(
-//                ", ", Arrays.copyOfRange(parts, halfIndex, parts.length));
 
         return broken;
     }

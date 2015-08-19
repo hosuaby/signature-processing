@@ -10,4 +10,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class ProducersConfig {
 
+    /** Rate of production */
+    public static final long PRODUCTION_RATE = 5000;
+
+    /** Base directory for signatures lists */
+    public static final String BASE_DIR = "/tmp/signatures/inbox/";
+
 }

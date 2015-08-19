@@ -11,10 +11,11 @@ import javax.annotation.PostConstruct;
 import org.apache.batik.apps.rasterizer.SVGConverter;
 import org.apache.batik.apps.rasterizer.SVGConverterException;
 import org.apache.batik.svggen.SVGGraphics2D;
-import org.apache.batik.svggen.SVGGraphics2DIOException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import io.hosuaby.signatures.generators.config.ProducersConfig;
 
 /**
  * Producer of lists with signatures with regular time interval.
@@ -22,19 +23,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class SignatureListsProducer {
 
-    /** Rate of production */
-    private static final long RATE = 5000;
-
-    /** Base directory for signatures lists */
-    private static final String BASE_DIR = "/tmp/signatures/lists/";
-
     /** Signature generator */
     @Autowired
     private RandomSignatureGenerator signatureGenerator;
 
-    /** Creator of SVG image of signatures list */
+    /** Render of list of signatures as SVG */
     @Autowired
-    private SignaturesSvgListCreator signatureSvgListCreator;
+    private SignaturesListSvgRender signatureListSvgRender;
 
     /** SVG to raster converter */
     @Autowired
@@ -45,28 +40,37 @@ public class SignatureListsProducer {
      */
     @PostConstruct
     public void createDir() {
-        new File(BASE_DIR).mkdirs();
+        new File(ProducersConfig.BASE_DIR).mkdirs();
     }
 
     /**
      * Produces list of signatures with fixed rate.
      */
-    @Scheduled(fixedRate = RATE)
+    @Scheduled(fixedRate = ProducersConfig.PRODUCTION_RATE)
     public void produce() {
 
-        /* UUID of the list */
-        UUID uuid = UUID.randomUUID();
+        /* Generate random list ID */
+        String listId = UUID.randomUUID().toString();
 
-        String filename = BASE_DIR + uuid.toString();   // filename
+        /* Filename */
+        String filename = ProducersConfig.BASE_DIR + listId.toString();
 
+        /* Generate random signatures */
         List<RandomSignature> signatures = signatureGenerator
                 .randomSignatures(30);
 
-        /* Create SVG image of the list of signatures */
-        SVGGraphics2D graphics = signatureSvgListCreator.draw(signatures);
+        /* Render list of signatures to SVG document */
+        SVGGraphics2D rendered = signatureListSvgRender.render(signatures);
 
         try {
-            graphics.stream(filename + ".svg", false);
+
+            /* Create the "lock" file for new list */
+            File lock = new File(filename + ".lock");
+            lock.createNewFile();
+
+            /* Create the SVG file with signatures */
+            File svg = new File(filename + ".svg");
+            rendered.stream(new FileWriter(svg), false);
 
             /* Convert SVG -> PNG */
             svgConverter.setSources(new String[] { filename + ".svg" });
@@ -74,19 +78,18 @@ public class SignatureListsProducer {
             svgConverter.execute();
 
             /* Delete original SVG file */
-            new File(filename + ".svg").delete();
-        } catch (SVGGraphics2DIOException | SVGConverterException e) {
-            e.printStackTrace();
-        }
+            svg.delete();
 
-        /* Write transcriptions of signatures to text file */
-        try {
+            /* Write transcriptions of signatures to text file */
             FileWriter fileWriter = new FileWriter(new File(filename + ".txt"));
             for (RandomSignature signature : signatures) {
                 fileWriter.write(signature.toString() + "\n");
             }
             fileWriter.close();
-        } catch (IOException e) {
+
+            /* Remove the "lock" file and allow to batch process this list */
+            lock.delete();
+        } catch (IOException | SVGConverterException e) {
             e.printStackTrace();
         }
     }
