@@ -4,6 +4,8 @@ import java.awt.image.BufferedImage;
 import java.util.Iterator;
 import java.util.Map;
 
+import javax.annotation.Resource;
+
 import org.springframework.batch.item.ExecutionContext;
 import org.springframework.batch.item.ItemStreamException;
 import org.springframework.batch.item.NonTransientResourceException;
@@ -12,45 +14,29 @@ import org.springframework.batch.item.UnexpectedInputException;
 import org.springframework.batch.item.file.MultiResourceItemReader;
 import org.springframework.batch.item.file.ResourceAwareItemReaderItemStream;
 import org.springframework.batch.item.support.AbstractItemStreamItemReader;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.context.ResourceLoaderAware;
-import org.springframework.core.io.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ResourceLoader;
-import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
+import io.hosuaby.signatures.config.BatchConfig;
 import io.hosuaby.signatures.domain.Signature;
 
 /**
  * Reader of signatures from transcript files.
  */
 public class InboxTranscriptReader
-        extends AbstractItemStreamItemReader<Signature>
-        implements InitializingBean, ResourceLoaderAware {
+        extends AbstractItemStreamItemReader<Signature> {
 
-    /** Delegete not provided message */
-    private static final String ERR_DELEGATE_NOT_PROVIDED = "Delegate ItemReader is not provided";
+    /** Spring resource loader */
+    @Autowired
+    private ResourceLoader resourceLoader;
 
-    /** Base dir not provided message */
-    private static final String ERR_BASE_DIR_NOT_PROVIDED = "Base dir is not provided";
-
-    /** Resource loader not provided message */
-    private static final String ERR_RESOURCE_LOADER_NOT_PROVIDED = "Resource loader not provided";
-
-    /** Store not provided message */
-    private static final String ERR_STORE_NOT_PROVIDED = "Scan store required";
+    /** Scan store */
+    @Resource(name = "scanStore")
+    private Map<String, BufferedImage> scanStore;
 
     /** Delegate item reader */
     private ResourceAwareItemReaderItemStream<? extends Signature> delegate;
-
-    /** Base directory for images */
-    private String baseDir;
-
-    /** Spring resource loader */
-    private ResourceLoader resourceLoader;
-
-    /** Store for ids of processed lists */
-    private Map<String, BufferedImage> scanStore;
 
     /** Iterator over list ids */
     private Iterator<String> iterator = null;
@@ -76,13 +62,15 @@ public class InboxTranscriptReader
     public Signature read() throws Exception, UnexpectedInputException,
             ParseException, NonTransientResourceException {
         if (!started) {
+            delegate.close();
             if (iterator.hasNext()) {
                 currentListId = iterator.next();
-                Resource resource =  resourceLoader
-                        .getResource("file:" + baseDir + currentListId
-                                + ".txt");
+                org.springframework.core.io.Resource resource =  resourceLoader
+                        .getResource("file:" + BatchConfig.INBOX_DIR
+                                + currentListId + ".txt");
                 delegate.setResource(resource);
                 delegate.open(new ExecutionContext());
+                started = true;
             } else {
                 return null;
             }
@@ -98,9 +86,9 @@ public class InboxTranscriptReader
 
             if (iterator.hasNext()) {
                 currentListId = iterator.next();
-                Resource resource =  resourceLoader
-                        .getResource("file:" + baseDir + currentListId
-                                + ".txt");
+                org.springframework.core.io.Resource resource =  resourceLoader
+                        .getResource("file:" + BatchConfig.INBOX_DIR
+                                + currentListId + ".txt");
                 delegate.setResource(resource);
                 delegate.open(new ExecutionContext());
             } else {
@@ -116,33 +104,6 @@ public class InboxTranscriptReader
 
     public void setDelegate(ResourceAwareItemReaderItemStream<? extends Signature> delegate) {
         this.delegate = delegate;
-    }
-
-    public void setBaseDir(String baseDir) {
-        this.baseDir = baseDir;
-
-        /* Add trailing slash if necessary */
-        if (this.baseDir.charAt(this.baseDir.length() - 1) != '/') {
-            this.baseDir += '/';
-        }
-    }
-
-    @Override
-    public void setResourceLoader(ResourceLoader resourceLoader) {
-        this.resourceLoader = resourceLoader;
-    }
-
-    public void setScanStore(Map<String, BufferedImage> scanStore) {
-        this.scanStore = scanStore;
-    }
-
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        Assert.state(delegate != null, ERR_DELEGATE_NOT_PROVIDED);
-        Assert.state(baseDir != null && !baseDir.isEmpty(),
-                ERR_BASE_DIR_NOT_PROVIDED);
-        Assert.state(resourceLoader != null, ERR_RESOURCE_LOADER_NOT_PROVIDED);
-        Assert.state(scanStore != null, ERR_STORE_NOT_PROVIDED);
     }
 
 }

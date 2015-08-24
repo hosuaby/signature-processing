@@ -28,6 +28,9 @@ public class Signature {
     /** List id */
     private String listId;
 
+    /** Number of line with signature in the list */
+    private int lineNumber;
+
     public String getFirstName() {
         return firstName;
     }
@@ -82,6 +85,14 @@ public class Signature {
 
     public void setListId(String listId) {
         this.listId = listId;
+    }
+
+    public int getLineNumber() {
+        return lineNumber;
+    }
+
+    public void setLineNumber(int lineNumber) {
+        this.lineNumber = lineNumber;
     }
 
 }

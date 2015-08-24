@@ -6,32 +6,24 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.annotation.Resource;
 import javax.imageio.ImageIO;
 
 import org.springframework.batch.item.ExecutionContext;
 import org.springframework.batch.item.ItemStreamException;
 import org.springframework.batch.item.support.AbstractItemStreamItemReader;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.util.Assert;
+
+import io.hosuaby.signatures.config.BatchConfig;
 
 /**
  * Loads scan images into store. Operation {@code read} returns id of every
  * loaded scan.
  */
-public class InboxScanReader
-        extends AbstractItemStreamItemReader<String>
-        implements InitializingBean {
+// TODO: optimize this class
+public class InboxScanReader extends AbstractItemStreamItemReader<String> {
 
-    /** Base dir not provided message */
-    private static final String ERR_BASE_DIR_NOT_PROVIDED = "Base dir is not provided!";
-
-    /** Store not provided message */
-    private static final String ERR_STORE_NOT_PROVIDED = "Scan store required";
-
-    /** Base directory for images */
-    private String baseDir;
-
-    /** Store for ids of processed lists */
+    /** Scan store */
+    @Resource(name = "scanStore")
     private Map<String, BufferedImage> scanStore;
 
     /** Iterator over the the store */
@@ -58,7 +50,7 @@ public class InboxScanReader
         if (iterator.hasNext()) {
             String listId = iterator.next();
             BufferedImage image = ImageIO.read(
-                    new File(baseDir + listId + ".png"));
+                    new File(BatchConfig.INBOX_DIR + listId + ".png"));
             scanStore.put(listId, image);
             return listId;
         }
@@ -81,26 +73,6 @@ public class InboxScanReader
             throws ItemStreamException {
         super.update(executionContext);
         executionContext.putInt(getExecutionContextKey("COUNT"), counter.get());
-    }
-
-    public void setBaseDir(String baseDir) {
-        this.baseDir = baseDir;
-
-        /* Add trailing slash if necessary */
-        if (this.baseDir.charAt(this.baseDir.length() - 1) != '/') {
-            this.baseDir += '/';
-        }
-    }
-
-    public void setScanStore(Map<String, BufferedImage> scanStore) {
-        this.scanStore = scanStore;
-    }
-
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        Assert.state(baseDir != null && !baseDir.isEmpty(),
-                ERR_BASE_DIR_NOT_PROVIDED);
-        Assert.state(scanStore != null, ERR_STORE_NOT_PROVIDED);
     }
 
 }

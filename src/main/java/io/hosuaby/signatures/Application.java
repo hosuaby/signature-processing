@@ -1,6 +1,7 @@
 package io.hosuaby.signatures;
 
-import org.springframework.boot.CommandLineRunner;
+import java.util.HashMap;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -8,23 +9,20 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * Main application class.
  */
 @SpringBootApplication
-public class Application implements CommandLineRunner {
+public class Application {
 
     public static void main(String[] args) {
-        SpringApplication.run(Application.class, args);
-    }
+        SpringApplication app = new SpringApplication(Application.class);
 
-    // TODO: try to run batch from console
-    @Override
-    public void run(String... args) throws Exception {
-//        SVGGraphics2D graphics = signatureSvgListGenerator.draw(signatureGenerator.randomSignatures(30));
-//        graphics.stream("/tmp/sign.svg", false);
-//
-//        svgConverter.setSources(new String[] { "/tmp/sign.svg" });
-//        svgConverter.setDst(new File("/tmp/sign.png"));
-//
-//        svgConverter.execute();
+        /* Disable automatic job run on startup */
+        app.setDefaultProperties(new HashMap<String, Object>() {
+            private static final long serialVersionUID = 1L;
+            {
+                put("spring.batch.job.enabled", new Boolean(false));
+            }
+        });
 
+        app.run(args);
     }
 
 }

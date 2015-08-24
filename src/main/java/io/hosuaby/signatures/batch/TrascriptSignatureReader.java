@@ -69,11 +69,27 @@ public class TrascriptSignatureReader extends FlatFileItemReader<Signature> {
      * @return line mapper
      */
     private LineMapper lineMapper() {
-        DefaultLineMapper<Signature> lineMapper =
-                new DefaultLineMapper<Signature>();
+        DefaultLineMapper<Signature> lineMapper = new SignatureLineMapper();
         lineMapper.setLineTokenizer(tokenizer());
         lineMapper.setFieldSetMapper(new SignatureFieldSetMapper());
         return lineMapper;
+    }
+
+    /**
+     * Signature line mapper.
+     */
+    private class SignatureLineMapper extends DefaultLineMapper<Signature> {
+
+        /**
+         * Sets lineNumber of read signature.
+         */
+        @Override
+        public Signature mapLine(String line, int lineNumber) throws Exception {
+            Signature signature = super.mapLine(line, lineNumber);
+            signature.setLineNumber(lineNumber);
+            return signature;
+        }
+
     }
 
     /**

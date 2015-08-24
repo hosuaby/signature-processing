@@ -6,34 +6,29 @@ import java.io.FilenameFilter;
 import java.util.Arrays;
 import java.util.Map;
 
+import javax.annotation.Resource;
+
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.listener.JobExecutionListenerSupport;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.util.Assert;
+
+import io.hosuaby.signatures.config.BatchConfig;
 
 /**
- * Loads ids of lists of signatures that must be processed by job and stores it
+ * Loads IDs of lists of signatures that must be processed by job and stores it
  * in job scoped store.
  */
-public class ListIdsLoader
-        extends JobExecutionListenerSupport
-        implements InitializingBean {
+public class ListIdsLoader extends JobExecutionListenerSupport {
 
-    /** Base dir not provided message */
-    private static final String ERR_BASE_DIR_NOT_PROVIDED = "Base dir is not provided!";
-
-    /** Store not provided message */
-    private static final String ERR_STORE_NOT_PROVIDED = "Scan store required";
-
-    /** Base directory for images */
-    private String baseDir;
-
-    /** Store for ids of processed lists */
+    /** Scan store */
+    @Resource(name = "scanStore")
     private Map<String, BufferedImage> scanStore;
 
+    /**
+     * Loads & stores IDs of processed lists into scan store.
+     */
     @Override
     public void beforeJob(JobExecution exec) {
-        File dir = new File(baseDir);
+        File dir = new File(BatchConfig.INBOX_DIR);
 
         String[] filenames = dir.list(new FilenameFilter() {
             @Override
@@ -45,28 +40,17 @@ public class ListIdsLoader
         Arrays.asList(filenames)
             .stream()
             . <String> map(filename -> filename.split("\\.")[0])
-            .filter(listId -> !new File(baseDir + listId + ".lock").exists())
+            .filter(listId -> !new File(BatchConfig.INBOX_DIR + listId
+                    + ".lock").exists())
             .forEach(listId -> scanStore.put(listId, null));
     }
 
-    public void setBaseDir(String baseDir) {
-        this.baseDir = baseDir;
-
-        /* Add trailing slash if necessary */
-        if (this.baseDir.charAt(this.baseDir.length() - 1) != '/') {
-            this.baseDir += '/';
-        }
-    }
-
-    public void setScanStore(Map<String, BufferedImage> scanStore) {
-        this.scanStore = scanStore;
-    }
-
+    /**
+     * Clears scan store.
+     */
     @Override
-    public void afterPropertiesSet() throws Exception {
-        Assert.state(baseDir != null && !baseDir.isEmpty(),
-                ERR_BASE_DIR_NOT_PROVIDED);
-        Assert.state(scanStore != null, ERR_STORE_NOT_PROVIDED);
+    public void afterJob(JobExecution jobExecution) {
+        scanStore.clear();
     }
 
 }

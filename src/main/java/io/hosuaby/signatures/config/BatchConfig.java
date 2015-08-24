@@ -1,6 +1,7 @@
 package io.hosuaby.signatures.config;
 
 import java.awt.image.BufferedImage;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -9,8 +10,9 @@ import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
-import org.springframework.batch.core.configuration.annotation.JobScope;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.job.builder.FlowBuilder;
+import org.springframework.batch.core.job.flow.support.SimpleFlow;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
@@ -19,9 +21,8 @@ import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ResourceLoader;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.data.mongodb.core.MongoOperations;
-import org.springframework.data.mongodb.gridfs.GridFsTemplate;
 
 import io.hosuaby.signatures.batch.GridFsScanWriter;
 import io.hosuaby.signatures.batch.InboxScanCleaner;
@@ -40,7 +41,7 @@ import io.hosuaby.signatures.domain.Signature;
 public class BatchConfig {
 
     /** Inbox directory */
-    private static final String INBOX_DIR = "/tmp/signatures/inbox/";
+    public static final String INBOX_DIR = "/tmp/signatures/inbox/";
 
     /** Builder factory for jobs */
     @Autowired
@@ -54,24 +55,21 @@ public class BatchConfig {
     @Autowired
     private MongoOperations mongoTemplate;
 
-    /** GridFS template */
-    @Autowired
-    private GridFsTemplate gridFsTemplate;
-
-    /** Resource loader */
-    @Autowired
-    private ResourceLoader resourceLoader;
-
     /**
      * @return main job
      */
     @Bean
     public Job job() {
+        FlowBuilder<SimpleFlow> flows = new FlowBuilder<SimpleFlow>("fb");
+
         return jobs.get("mainJob")
                 .incrementer(new RunIdIncrementer())
                 .listener(listIdsLoader())
                 .flow(loadScans())
-                .next(loadTranscripts())
+                .split(new SimpleAsyncTaskExecutor())
+                .add(flows
+                        .from(loadTranscripts())
+                        .end())
                 .end()
                 .build();
     }
@@ -103,19 +101,15 @@ public class BatchConfig {
     /**
      * @return store for ids of processed signature lists by the job.
      */
-    @Bean
-    @JobScope
+    @Bean(name = "scanStore")
     public Map<String, BufferedImage> scanStore() {
-        return new HashMap<String, BufferedImage>();
+        return Collections.synchronizedMap(
+                new HashMap<String, BufferedImage>());
     }
 
     @Bean
     public JobExecutionListener listIdsLoader() {
-        ListIdsLoader loader =
-                new ListIdsLoader();
-        loader.setBaseDir(INBOX_DIR);
-        loader.setScanStore(scanStore());
-        return loader;
+        return new ListIdsLoader();
     }
 
     /**
@@ -123,10 +117,7 @@ public class BatchConfig {
      */
     @Bean
     public ItemReader<String> inboxScanReader() {
-        InboxScanReader scanReader = new InboxScanReader();
-        scanReader.setBaseDir(INBOX_DIR);
-        scanReader.setScanStore(scanStore());
-        return scanReader;
+        return new InboxScanReader();
     }
 
     /**
@@ -134,10 +125,7 @@ public class BatchConfig {
      */
     @Bean
     public ItemWriter<String> gridFsScanWriter() {
-        GridFsScanWriter scanWriter = new GridFsScanWriter();
-        scanWriter.setTemplate(gridFsTemplate);
-        scanWriter.setScanStore(scanStore());
-        return scanWriter;
+        return new GridFsScanWriter();
     }
 
     /**
@@ -145,10 +133,7 @@ public class BatchConfig {
      */
     @Bean
     public InboxScanCleaner inboxScanCleaner() {
-        InboxScanCleaner cleaner = new InboxScanCleaner();
-        cleaner.setBaseDir(INBOX_DIR);
-        cleaner.setScanStore(scanStore());
-        return cleaner;
+        return new InboxScanCleaner();
     }
 
     /**
@@ -157,9 +142,6 @@ public class BatchConfig {
     @Bean
     public ItemReader<Signature> inboxTranscriptReader() {
         InboxTranscriptReader transcriptsReader = new InboxTranscriptReader();
-        transcriptsReader.setBaseDir(INBOX_DIR);
-        transcriptsReader.setResourceLoader(resourceLoader);
-        transcriptsReader.setScanStore(scanStore());
         transcriptsReader.setDelegate(trascriptSignatureReader());
         return transcriptsReader;
     }
@@ -188,10 +170,7 @@ public class BatchConfig {
      */
     @Bean
     public InboxTranscriptCleaner inboxTrascriptCleaner() {
-        InboxTranscriptCleaner cleaner = new InboxTranscriptCleaner();
-        cleaner.setBaseDir(INBOX_DIR);
-        cleaner.setScanStore(scanStore());
-        return cleaner;
+        return new InboxTranscriptCleaner();
     }
 
 }
