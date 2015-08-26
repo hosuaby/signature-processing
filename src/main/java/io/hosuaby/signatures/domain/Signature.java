@@ -29,7 +29,10 @@ public class Signature {
     private String listId;
 
     /** Number of line with signature in the list */
-    private int lineNumber;
+    private Integer lineNumber;
+
+    /** Image of the sign */
+    private Sign sign;
 
     public String getFirstName() {
         return firstName;
@@ -87,12 +90,20 @@ public class Signature {
         this.listId = listId;
     }
 
-    public int getLineNumber() {
+    public Integer getLineNumber() {
         return lineNumber;
     }
 
-    public void setLineNumber(int lineNumber) {
+    public void setLineNumber(Integer lineNumber) {
         this.lineNumber = lineNumber;
+    }
+
+    public Sign getSign() {
+        return sign;
+    }
+
+    public void setSign(Sign sign) {
+        this.sign = sign;
     }
 
 }

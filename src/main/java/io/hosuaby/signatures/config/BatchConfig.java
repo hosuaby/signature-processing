@@ -14,14 +14,17 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.flow.support.SimpleFlow;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.data.MongoItemReader;
 import org.springframework.batch.item.data.MongoItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.mongodb.core.MongoOperations;
 
 import io.hosuaby.signatures.batch.GridFsScanWriter;
@@ -30,6 +33,7 @@ import io.hosuaby.signatures.batch.InboxScanReader;
 import io.hosuaby.signatures.batch.InboxTranscriptCleaner;
 import io.hosuaby.signatures.batch.InboxTranscriptReader;
 import io.hosuaby.signatures.batch.ListIdsLoader;
+import io.hosuaby.signatures.batch.SignatureSignAdder;
 import io.hosuaby.signatures.batch.TrascriptSignatureReader;
 import io.hosuaby.signatures.domain.Signature;
 
@@ -38,6 +42,8 @@ import io.hosuaby.signatures.domain.Signature;
  */
 @Configuration
 @EnableBatchProcessing
+// TODO: check if steps must be declared as beans
+// TODO: check the bean's javadoc
 public class BatchConfig {
 
     /** Inbox directory */
@@ -70,12 +76,13 @@ public class BatchConfig {
                 .add(flows
                         .from(loadTranscripts())
                         .end())
+                .next(addSign())
                 .end()
                 .build();
     }
 
     /**
-     * @return loads the image scans and saves them into GridFS
+     * @return step loading image scans and saving them into GridFS
      */
     public Step loadScans() {
         return steps.get("loadScans")
@@ -87,14 +94,26 @@ public class BatchConfig {
     }
 
     /**
-     * @return loads transcripts of signature lists
+     * @return step loading transcripts of signature lists
      */
     public Step loadTranscripts() {
         return steps.get("loadTranscripts")
-                .<Signature, Signature> chunk(10)
+                . <Signature, Signature> chunk(10)
                 .reader(inboxTranscriptReader())
-                .writer(signatureMongoWriter())
+                .writer(signaturePreloadMongoWriter())
                 .listener(inboxTrascriptCleaner())
+                .build();
+    }
+
+    /**
+     * @return step adding sign image to signature
+     */
+    public Step addSign() {
+        return steps.get("addSign")
+                . <Signature, Signature> chunk(10)
+                .reader(signatureMongoReader())
+                .processor(signatureSignAdder())
+                .writer(signatureInboxMongoWriter())
                 .build();
     }
 
@@ -155,10 +174,47 @@ public class BatchConfig {
     }
 
     /**
-     * @return item writer for persons to mongo
+     * @return writer of {@link Signature}s to mongo
      */
     @Bean
-    public ItemWriter<Signature> signatureMongoWriter() {
+    public ItemWriter<Signature> signaturePreloadMongoWriter() {
+        MongoItemWriter<Signature> itemWriter = new MongoItemWriter<>();
+        itemWriter.setTemplate(mongoTemplate);
+        itemWriter.setCollection("preload");
+        return itemWriter;
+    }
+
+    /**
+     * @return adder of sign to signature
+     */
+    @Bean
+    public ItemProcessor<Signature, Signature> signatureSignAdder() {
+        return new SignatureSignAdder();
+    }
+
+    /**
+     * @return reader of {@code Signature}s from collection "inbox" in mongo
+     */
+    // TODO: create special reader
+    @Bean
+    public ItemReader<Signature> signatureMongoReader() {
+        MongoItemReader<Signature> itemReader = new MongoItemReader<>();
+        itemReader.setTemplate(mongoTemplate);
+        itemReader.setCollection("preload");
+        itemReader.setTargetType(Signature.class);
+        itemReader.setQuery("{}");
+        itemReader.setSort(new HashMap<String, Direction>() {
+            private static final long serialVersionUID = 1L;
+            {
+                put("listId", Direction.ASC);
+                put("lineNumber", Direction.ASC);
+            }
+        });
+        return itemReader;
+    }
+
+    @Bean
+    public ItemWriter<Signature> signatureInboxMongoWriter() {
         MongoItemWriter<Signature> itemWriter = new MongoItemWriter<>();
         itemWriter.setTemplate(mongoTemplate);
         itemWriter.setCollection("inbox");

@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component;
 import io.hosuaby.signatures.generators.config.ProducersConfig;
 
 /**
- * Producer of lists with signatures with regular time interval.
+ * Producer of images of lists with signatures in regular time interval.
+ * Simulates collection of signattures on the paper list.
  */
 @Component
 public class SignatureListsProducer {
