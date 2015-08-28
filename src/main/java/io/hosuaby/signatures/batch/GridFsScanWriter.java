@@ -1,41 +1,53 @@
 package io.hosuaby.signatures.batch;
 
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.List;
-import java.util.Map;
 
-import javax.annotation.Resource;
 import javax.imageio.ImageIO;
 
-import org.springframework.batch.item.support.AbstractItemStreamItemWriter;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.batch.item.ItemWriter;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.data.mongodb.gridfs.GridFsTemplate;
+import org.springframework.util.Assert;
+
+import io.hosuaby.signatures.domain.Scan;
 
 /**
  * Write for scan images to Mongo GridFS.
  */
-public class GridFsScanWriter extends AbstractItemStreamItemWriter<String> {
+public class GridFsScanWriter implements ItemWriter<Scan>, InitializingBean {
 
-    /** Scan store */
-    @Resource(name = "scanStore")
-    private Map<String, BufferedImage> scanStore;
+    /** Error message when GridFS template is not provided */
+    private static final String ERR_GRIDFS_TEMPLATE_NULL = "GridFS template must be provided";
 
     /** GridFS template */
-    @Autowired
-    private GridFsTemplate gridFs;
+    private GridFsTemplate template;
 
     @Override
-    public void write(List<? extends String> listIds) throws Exception {
-        for (String listId : listIds) {
+    public void write(List<? extends Scan> scans) throws Exception {
+        for (Scan scan : scans) {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            ImageIO.write(scanStore.get(listId), "png", outputStream);
+            ImageIO.write(scan.getImage(), "png", outputStream);
             InputStream inputStream =
                     new ByteArrayInputStream(outputStream.toByteArray());
-            gridFs.store(inputStream, listId);
+            template.store(inputStream, scan.getListId());
         }
+    }
+
+    /**
+     * Sets GridFS template.
+     *
+     * @param template    GridFS template
+     */
+    public void setTemplate(GridFsTemplate template) {
+        this.template = template;
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        Assert.notNull(template, ERR_GRIDFS_TEMPLATE_NULL);
     }
 
 }

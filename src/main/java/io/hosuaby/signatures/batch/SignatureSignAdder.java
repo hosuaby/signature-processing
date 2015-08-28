@@ -4,10 +4,11 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.util.Map;
 
-import javax.annotation.Resource;
 import javax.imageio.ImageIO;
 
 import org.springframework.batch.item.ItemProcessor;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.util.Assert;
 
 import io.hosuaby.signatures.domain.SignPng;
 import io.hosuaby.signatures.domain.Signature;
@@ -15,10 +16,13 @@ import io.hosuaby.signatures.domain.Signature;
 /**
  * Processor that adds sign image to the {@code Signature} object.
  */
-public class SignatureSignAdder implements ItemProcessor<Signature, Signature> {
+public class SignatureSignAdder implements ItemProcessor<Signature, Signature>,
+        InitializingBean {
+
+    /** Error message when scan store is not provided */
+    private static final String ERR_SCAN_STORE_NULL = "Scan store must be provided";
 
     /** Scan store */
-    @Resource(name = "scanStore")
     private Map<String, BufferedImage> scanStore;
 
     @Override
@@ -43,6 +47,20 @@ public class SignatureSignAdder implements ItemProcessor<Signature, Signature> {
         }
 
         return signature;
+    }
+
+    /**
+     * Sets scan store.
+     *
+     * @param scanStore    scan store
+     */
+    public void setScanStore(Map<String, BufferedImage> scanStore) {
+        this.scanStore = scanStore;
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        Assert.notNull(scanStore, ERR_SCAN_STORE_NULL);
     }
 
 }
